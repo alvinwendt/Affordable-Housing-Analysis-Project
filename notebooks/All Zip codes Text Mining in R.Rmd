@@ -1,0 +1,252 @@
+---
+title: "Text_Mining"
+author: "Alvin Wendt"
+date: "5/14/2021"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(tidytext)
+library(drlib)
+library(quanteda)
+library(stm)
+library(SnowballC)
+```
+
+```{r}
+q4_data_raw <- read.csv(file = 'q4 Data.csv')
+
+q4_text_zip <- q4_data_raw %>%
+    select(propzip, purpose)
+    
+q4_text_zip
+```
+
+```{r}
+tidy_q4 <- q4_text_zip %>%
+    unnest_tokens(word, purpose) %>%
+    anti_join(stop_words)
+    #%>% filter(word != "xyz")
+
+tidy_q4$word <- stringr::str_replace_all(tidy_q4$word,"[^a-zA-Z\\s]", " ")
+
+tidy_q4$word <- stringr::str_replace_all(tidy_q4$word,"[\\s]+", "")
+
+tidy_q4 =  tidy_q4[!(is.na(tidy_q4) | tidy_q4==""| tidy_q4==" "| tidy_q4=="  "), ]
+
+# This function lemmatizes words
+#tidy_q4 <- tidy_q4 %>%
+ # mutate(word = wordStem(word)) 
+
+tidy_q4 %>%
+    count(word, sort = TRUE)
+```
+
+
+```{r}
+q4_tf_idf <- tidy_q4 %>%
+    count(propzip, word, sort = TRUE) %>%
+    bind_tf_idf(word, propzip, n) %>%
+    arrange(-tf_idf) %>%
+    group_by(propzip) %>%
+    top_n(10) %>%
+    ungroup
+
+q4_tf_idf %>%
+    mutate(word = reorder_within(word, tf_idf, propzip)) %>%
+    ggplot(aes(word, tf_idf, fill = propzip)) +
+    geom_col(alpha = 0.8, show.legend = FALSE) +
+    facet_wrap(~ propzip, scales = "free", ncol = 3) +
+    scale_x_reordered() +
+    coord_flip() +
+    theme(strip.text=element_text(size=11)) +
+    labs(x = NULL, y = "tf-idf",
+         title = "Highest tf-idf words in Nashville Zip Code")
+
+```
+
+
+```{r}
+q4_dfm <- tidy_q4 %>%
+    count(propzip, word, sort = TRUE) %>%
+    cast_dfm(propzip, word, n)
+
+q4_sparse <- tidy_q4 %>%
+    count(propzip, word, sort = TRUE) %>%
+    cast_sparse(propzip, word, n)
+
+```
+
+
+```{r}
+topic_model6 <- stm(q4_dfm, K = 6, 
+                   verbose = FALSE, init.type = "Spectral")
+
+topic_model5 <- stm(q4_dfm, K = 5, 
+                   verbose = FALSE, init.type = "Spectral")
+
+topic_model4 <- stm(q4_dfm, K = 4, 
+                   verbose = FALSE, init.type = "Spectral")
+
+topic_model3 <- stm(q4_dfm, K = 3, 
+                   verbose = FALSE, init.type = "Spectral")
+
+topic_model2 <- stm(q4_dfm, K = 2, 
+                   verbose = FALSE, init.type = "Spectral")
+
+
+```
+
+
+```{r}
+td_beta <- tidy(topic_model6)
+
+td_beta %>%
+    group_by(topic) %>%
+    top_n(10, beta) %>%
+    ungroup() %>%
+    mutate(topic = paste0("Topic ", topic),
+           term = reorder_within(term, beta, topic)) %>%
+    ggplot(aes(term, beta, fill = as.factor(topic))) +
+    geom_col(alpha = 0.8, show.legend = FALSE) +
+    facet_wrap(~ topic, scales = "free_y") +
+    coord_flip() +
+    scale_x_reordered() +
+    labs(x = NULL, y = expression(beta),
+         title = "Highest word probabilities for each topic",
+         subtitle = "Different words are associated with different topics")
+
+```
+
+
+```{r}
+td_gamma <- tidy(topic_model6, matrix = "gamma",                    
+                 document_names = rownames(q4_dfm))
+
+ggplot(td_gamma, aes(gamma, fill = as.factor(topic))) +
+  geom_histogram(alpha = 0.8, show.legend = FALSE) +
+  facet_wrap(~ topic, ncol = 3) +
+  labs(title = "Distribution of document probabilities for each topic",
+       y = "Number of Zip codes", x = expression(gamma))
+
+```
+
+
+```{r}
+td_beta <- tidy(topic_model5)
+
+td_beta %>%
+    group_by(topic) %>%
+    top_n(10, beta) %>%
+    ungroup() %>%
+    mutate(topic = paste0("Topic ", topic),
+           term = reorder_within(term, beta, topic)) %>%
+    ggplot(aes(term, beta, fill = as.factor(topic))) +
+    geom_col(alpha = 0.8, show.legend = FALSE) +
+    facet_wrap(~ topic, scales = "free_y") +
+    coord_flip() +
+    scale_x_reordered() +
+    labs(x = NULL, y = expression(beta),
+         title = "Highest word probabilities for each topic",
+         subtitle = "Different words are associated with different topics")
+
+td_gamma <- tidy(topic_model5, matrix = "gamma",                    
+                 document_names = rownames(q4_dfm))
+
+ggplot(td_gamma, aes(gamma, fill = as.factor(topic))) +
+  geom_histogram(alpha = 0.8, show.legend = FALSE) +
+  facet_wrap(~ topic, ncol = 3) +
+  labs(title = "Distribution of document probabilities for each topic",
+       y = "Number of Zip codes", x = expression(gamma))
+
+```
+
+
+```{r}
+td_beta <- tidy(topic_model4)
+
+td_beta %>%
+    group_by(topic) %>%
+    top_n(10, beta) %>%
+    ungroup() %>%
+    mutate(topic = paste0("Topic ", topic),
+           term = reorder_within(term, beta, topic)) %>%
+    ggplot(aes(term, beta, fill = as.factor(topic))) +
+    geom_col(alpha = 0.8, show.legend = FALSE) +
+    facet_wrap(~ topic, scales = "free_y") +
+    coord_flip() +
+    scale_x_reordered() +
+    labs(x = NULL, y = expression(beta),
+         title = "Highest word probabilities for each topic",
+         subtitle = "Different words are associated with different topics")
+
+td_gamma <- tidy(topic_model4, matrix = "gamma",                    
+                 document_names = rownames(q4_dfm))
+
+ggplot(td_gamma, aes(gamma, fill = as.factor(topic))) +
+  geom_histogram(alpha = 0.8, show.legend = FALSE) +
+  facet_wrap(~ topic, ncol = 3) +
+  labs(title = "Distribution of document probabilities for each topic",
+       y = "Number of Zip codes", x = expression(gamma))
+
+```
+
+
+```{r}
+td_beta <- tidy(topic_model3)
+
+td_beta %>%
+    group_by(topic) %>%
+    top_n(10, beta) %>%
+    ungroup() %>%
+    mutate(topic = paste0("Topic ", topic),
+           term = reorder_within(term, beta, topic)) %>%
+    ggplot(aes(term, beta, fill = as.factor(topic))) +
+    geom_col(alpha = 0.8, show.legend = FALSE) +
+    facet_wrap(~ topic, scales = "free_y") +
+    coord_flip() +
+    scale_x_reordered() +
+    labs(x = NULL, y = expression(beta),
+         title = "Highest word probabilities for each topic",
+         subtitle = "Different words are associated with different topics")
+
+td_gamma <- tidy(topic_model3, matrix = "gamma",                    
+                 document_names = rownames(q4_dfm))
+
+ggplot(td_gamma, aes(gamma, fill = as.factor(topic))) +
+  geom_histogram(alpha = 0.8, show.legend = FALSE) +
+  facet_wrap(~ topic, ncol = 3) +
+  labs(title = "Distribution of document probabilities for each topic",
+       y = "Number of Zip codes", x = expression(gamma))
+
+```
+
+```{r}
+td_beta <- tidy(topic_model2)
+
+td_beta %>%
+    group_by(topic) %>%
+    top_n(10, beta) %>%
+    ungroup() %>%
+    mutate(topic = paste0("Topic ", topic),
+           term = reorder_within(term, beta, topic)) %>%
+    ggplot(aes(term, beta, fill = as.factor(topic))) +
+    geom_col(alpha = 0.8, show.legend = FALSE) +
+    facet_wrap(~ topic, scales = "free_y") +
+    coord_flip() +
+    scale_x_reordered() +
+    labs(x = NULL, y = expression(beta),
+         title = "Highest word probabilities for each topic",
+         subtitle = "Different words are associated with different topics")
+
+td_gamma <- tidy(topic_model2, matrix = "gamma",                    
+                 document_names = rownames(q4_dfm))
+
+ggplot(td_gamma, aes(gamma, fill = as.factor(topic))) +
+  geom_histogram(alpha = 0.8, show.legend = FALSE) +
+  facet_wrap(~ topic, ncol = 3) +
+  labs(title = "Distribution of document probabilities for each topic",
+       y = "Number of Zip codes", x = expression(gamma))
+```
+
